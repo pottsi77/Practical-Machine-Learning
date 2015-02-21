@@ -1,0 +1,151 @@
+###Practical Machine Learning Project
+
+###Summary 
+#####This is a class project for Practical Machine Learning.  We are trying to classify the correctness of barbell excercise technique using data from fitness gadgets with accelerometers.  The response variable is ordinal in nature with 5 levels (A-E), essentially an expert's judgment of a bicep curl.  A training data set with approx 20,000 records will be used to build a final prediction model to be applied to a data set with 20 records.
+
+####Load Libraries
+```{r results='hide', message=FALSE, warning=FALSE}
+library(caret)
+library(lattice)
+library(C50)
+library(sqldf)
+```
+
+####Load data sets
+```{r}
+training1 <- read.csv("pml-training.csv", na.strings = c("NA", ""), header = TRUE)
+testing1 <- read.csv("pml-testing.csv", na.strings = c("NA", ""), header = TRUE)
+```
+
+####Data Cleaning
+######Remove the X (ID), username and TimeStamp variables
+```{r}
+training2 <- training1[, -1:-5]
+testing2 <- testing1[, -1:-5]
+```
+
+######Identify of variables with NAs (missing) >= 60%
+```{r}
+columns_ge_60pct_NA <- vector()
+vectorCounter <- 0
+for (i in 1:ncol(training2)) {
+    if ((sum(is.na(training2[, i]))/nrow(training2)) >= 0.6) {
+        vectorCounter <- vectorCounter + 1
+        columns_ge_60pct_NA[vectorCounter] <- i
+    }
+}
+```
+
+
+######Remove variables with NAs (missing) >= 60%
+```{r}
+training3 <- training2[, -columns_ge_60pct_NA]
+testing3 <- testing2[, -columns_ge_60pct_NA]
+```
+
+#####Identify variables with Near Zero Variance
+```{r}
+nsvColumns <- nearZeroVar(training3)
+```
+
+#####Remove variables with Near Zero Variance.
+```{r}
+training <- training3[, -nsvColumns]
+testing <- testing3[, -nsvColumns]
+```
+
+#####The Training data frame will get split further (70/30) because the final Testing data frame will have only 20 records.  20 records would be insufficient for preventing the over-fitting of the models.  Final data frames will be:
+######1 - train - 70% of training data set
+######2 - test - 30% of training data set
+######3 - testing - 20 record final testing data set
+```{r}
+inTrain <- createDataPartition(training$class, p = 0.7, list = FALSE)
+train <- training[inTrain, ]
+test <- training[-inTrain, ]
+```
+
+#####Cleanup RAM
+```{r}
+rm(testing1)
+rm(testing2)
+rm(testing3)
+rm(training)
+rm(training1)
+rm(training2)
+rm(training3)
+```
+
+####Model Development - 6 different "methods" using the caret "train" function:
+
+##### 1) C5.0 - C5.0
+##### 2) nb - Naive Bayes
+##### 3) nnet - Neural Network
+##### 4) rf - Random Forest
+##### 5) rpart - CART
+##### 6) rpart2 - CART
+
+#####Output will be suppressed for brevity, the Accuracy Ratio (AR) will be captured for each model on both train and test.  AR test will be used to select the final model and tie breakers will be decided using AR train.
+```{r,include=FALSE}
+model_C5 <- train(classe~.,data=train,method='C5.0')
+```
+
+```{r,eval=FALSE}
+#C5.0
+model_C5 <- train(classe~.,data=train,method='C5.0')
+confusionMatrix(predict(model_C5,newdata=test),test$classe)
+AR_test_C5.0 <- mean(predict(model_C5, newdata=test) == test$classe) * 100
+AR_train_C5.0 <- mean(predict(model_C5, newdata=train) == train$classe) * 100
+output_C5.0 <- as.data.frame(rbind(c('C5.0',AR_test_C5.0,AR_train_C5.0)))
+#nb
+model_nb <- train(classe~.,data=train,method='nb')
+confusionMatrix(predict(model_nb,newdata=test),test$classe)
+AR_test_nb <- mean(predict(model_nb, newdata=test) == test$classe) * 100
+AR_train_nb <- mean(predict(model_nb, newdata=train) == train$classe) * 100
+output_nb <- as.data.frame(rbind(c('nb',AR_test_nb,AR_train_nb)))
+#nnet
+model_nnet <- train(classe~.,data=train,method='nnet')
+confusionMatrix(predict(model_nnet,newdata=test),test$classe)
+AR_test_nnet <- mean(predict(model_nnet, newdata=test) == test$classe) * 100
+AR_train_nnet <- mean(predict(model_nnet, newdata=train) == train$classe) * 100
+output_nnet <- as.data.frame(rbind(c('nnet',AR_test_nnet,AR_train_nnet)))
+#rf
+model_rf <- train(classe~.,data=train,method='rf')
+confusionMatrix(predict(model_rf,newdata=test),test$classe)
+AR_test_rf <- mean(predict(model_rf, newdata=test) == test$classe) * 100
+AR_train_rf <- mean(predict(model_rf, newdata=train) == train$classe) * 100
+output_rf <- as.data.frame(rbind(c('rf',AR_test_rf,AR_train_rf)))
+#rpart
+model_rpart <- train(classe~.,data=train,method='rpart')
+confusionMatrix(predict(model_rpart,newdata=test),test$classe)
+AR_test_rpart <- mean(predict(model_rpart, newdata=test) == test$classe) * 100
+AR_train_rpart <- mean(predict(model_rpart, newdata=train) == train$classe) * 100
+output_rpart <- as.data.frame(rbind(c('rpart',AR_test_rpart,AR_train_rpart)))
+#rpart2
+model_rpart2 <- train(classe~.,data=train,method='rpart2')
+confusionMatrix(predict(model_rpart2,newdata=test),test$classe)
+AR_test_rpart2 <- mean(predict(model_rpart2, newdata=test) == test$classe) * 100
+AR_train_rpart2 <- mean(predict(model_rpart2, newdata=train) == train$classe) * 100
+output_rpart2 <- as.data.frame(rbind(c('rpart2',AR_test_rpart2,AR_train_rpart2)))
+```
+
+######The accuracy ratios for train and test data sets are aggregated, ranked and printed.  Note: the code below loads the output data frame from a csv that was generated in a prior run.
+```{r,results='markup'}
+#output <- as.data.frame(rbind(output_C5.0, output_nb, output_nnet, output_rf, output_rpart, output_rpart2))
+output <- read.csv('C:/Users/qznv7v/Desktop/R/Practical Machine Learning/Output.csv', header = TRUE)
+output_final <- sqldf('select V1 as "method", V2 as "AR_test", V3 as "AR_train" from output order by V2 desc, V3 desc')
+print (output_final)
+```
+#####Final Model Selected: C5.0
+
+####Confusion Matrix - C5.0
+```{r,results='markup'}
+confusionMatrix(predict(model_C5,newdata=test),test$classe)
+```
+
+###Conclusion
+#####The Decision Tree algorithm C5.0 yielded the highest accuracy ratio on test data set so that is the final model selected.
+
+####Submission Results:
+```{r,results='markup'}
+print(predict(model_C5, newdata = testing))
+```
